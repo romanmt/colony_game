@@ -16,6 +16,8 @@ defmodule ColonyGame.Application do
       {Finch, name: ColonyGame.Finch},
       # Start a worker by calling: ColonyGame.Worker.start_link(arg)
       # {ColonyGame.Worker, arg},
+      {Registry, keys: :unique, name: ColonyGame.Game.Registry},
+      ColonyGame.Game.PlayerSupervisor,
       # Start to serve requests, typically the last entry
       ColonyGameWeb.Endpoint
     ]
