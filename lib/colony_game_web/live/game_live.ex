@@ -11,8 +11,18 @@ defmodule ColonyGameWeb.GameLive do
     Logger.info("Starting player process for ID: #{player_id}")
     PlayerSupervisor.start_player(player_id)
 
+    if connected?(socket), do: Process.send_after(self(), :tick, 5000)
+
     {:ok,
      assign(socket, player_id: player_id, resources: PlayerProcess.get_state(player_id).resources)}
+  end
+
+  @impl true
+  def handle_info(:tick, socket) do
+    new_resources = PlayerProcess.get_state(socket.assigns.player_id).resources
+    # Reschedule the next tick
+    Process.send_after(self(), :tick, 5000)
+    {:noreply, assign(socket, resources: new_resources)}
   end
 
   @impl true

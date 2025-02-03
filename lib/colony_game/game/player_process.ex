@@ -37,6 +37,11 @@ defmodule ColonyGame.Game.PlayerProcess do
     {:noreply, %{state | resources: new_resources}}
   end
 
+  def handle_cast(:tick, state) do
+    new_resources = Map.update!(state.resources, :food, &(&1 + 1))
+    {:noreply, %{state | resources: new_resources}}
+  end
+
   ## Internal Helper
 
   defp via_tuple(player_id), do: {:via, Registry, {ColonyGame.Game.Registry, player_id}}

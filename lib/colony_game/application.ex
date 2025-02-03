@@ -18,6 +18,7 @@ defmodule ColonyGame.Application do
       # {ColonyGame.Worker, arg},
       {Registry, keys: :unique, name: ColonyGame.Game.Registry},
       ColonyGame.Game.PlayerSupervisor,
+      ColonyGame.Game.TickServer,
       # Start to serve requests, typically the last entry
       ColonyGameWeb.Endpoint
     ]
