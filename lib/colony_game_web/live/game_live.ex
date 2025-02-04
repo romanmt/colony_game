@@ -13,16 +13,24 @@ defmodule ColonyGameWeb.GameLive do
 
     if connected?(socket), do: Process.send_after(self(), :tick, 5000)
 
+    state = PlayerProcess.get_state(player_id)
+
     {:ok,
-     assign(socket, player_id: player_id, resources: PlayerProcess.get_state(player_id).resources)}
+     assign(socket,
+       player_id: player_id,
+       resources: state.resources,
+       tick_counter: state.tick_counter
+     )}
   end
 
   @impl true
   def handle_info(:tick, socket) do
-    new_resources = PlayerProcess.get_state(socket.assigns.player_id).resources
+    state = PlayerProcess.get_state(socket.assigns.player_id)
+    new_resources = state.resources
+    tick_counter = state.tick_counter
     # Reschedule the next tick
     Process.send_after(self(), :tick, 5000)
-    {:noreply, assign(socket, resources: new_resources)}
+    {:noreply, assign(socket, resources: new_resources, tick_counter: tick_counter)}
   end
 
   @impl true
@@ -48,6 +56,7 @@ defmodule ColonyGameWeb.GameLive do
     ~H"""
     <div>
       <h1>Welcome, Colonist <%= @player_id %></h1>
+      <p>Civilization Age: <%= @tick_counter %></p>
 
       <p>Resources:</p>
       <ul>
