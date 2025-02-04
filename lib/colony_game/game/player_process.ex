@@ -29,6 +29,15 @@ defmodule ColonyGame.Game.PlayerProcess do
     {:ok, state}
   end
 
+  def update_resources(player_id, new_resources) do
+    GenServer.cast(via_tuple(player_id), {:update_resources, new_resources})
+  end
+
+  def handle_cast({:update_resources, new_resources}, state) do
+    updated_resources = Map.merge(state.resources, new_resources, fn _, old, new -> old + new end)
+    {:noreply, %{state | resources: updated_resources}}
+  end
+
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
   end

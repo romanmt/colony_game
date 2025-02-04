@@ -19,6 +19,7 @@ defmodule ColonyGame.Application do
       {Registry, keys: :unique, name: ColonyGame.Game.Registry},
       ColonyGame.Game.PlayerSupervisor,
       ColonyGame.Game.TickServer,
+      ColonyGame.Game.ForagingServer,
       # Start to serve requests, typically the last entry
       ColonyGameWeb.Endpoint
     ]
