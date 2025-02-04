@@ -1,5 +1,6 @@
 defmodule ColonyGame.Game.PlayerProcess do
   use GenServer
+  import Logger
 
   @initial_resources %{food: 100, water: 100, energy: 100}
 
@@ -23,7 +24,8 @@ defmodule ColonyGame.Game.PlayerProcess do
     state = %{
       player_id: player_id,
       resources: @initial_resources,
-      last_updated: System.system_time(:second)
+      last_updated: System.system_time(:second),
+      tick_counter: 0
     }
 
     {:ok, state}
@@ -47,8 +49,25 @@ defmodule ColonyGame.Game.PlayerProcess do
   end
 
   def handle_cast(:tick, state) do
-    new_resources = Map.update!(state.resources, :food, &(&1 + 1))
-    {:noreply, %{state | resources: new_resources}}
+    Logger.debug(inspect(state))
+    tick = state.tick_counter + 1
+
+    new_resources = state.resources
+
+    new_resources =
+      if rem(tick, 5) == 0 do
+        %{new_resources | food: max(new_resources.food - 1, 0)}
+      else
+        new_resources
+      end
+
+    {:noreply,
+     %{
+       state
+       | resources: new_resources,
+         tick_counter: tick,
+         last_updated: System.system_time(:seconds)
+     }}
   end
 
   ## Internal Helper
