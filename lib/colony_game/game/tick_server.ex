@@ -29,5 +29,7 @@ defmodule ColonyGame.Game.TickServer do
     for {_, pid, _, _} <- players do
       GenServer.cast(pid, :tick)
     end
+
+    GenServer.cast(ColonyGame.Game.ForagingServer, :tick)
   end
 end

@@ -2,8 +2,8 @@ defmodule ColonyGame.Game.ForagingServer do
   use GenServer
   alias ColonyGame.Game.PlayerProcess
 
-  # Food regrows every 10 seconds
-  @tick_interval 10_000
+  # Food regrows every 10 ticks
+  @tick_interval 30
 
   def start_link(_arg) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -18,7 +18,7 @@ defmodule ColonyGame.Game.ForagingServer do
   def init(state) do
     :ets.new(:food_sources, [:set, :public, :named_table])
     seed_food_sources()
-    schedule_food_regeneration()
+    state = %{tick_counter: 0}
     {:ok, state}
   end
 
@@ -35,7 +35,19 @@ defmodule ColonyGame.Game.ForagingServer do
 
   def handle_info(:regrow_food, state) do
     regrow_food()
-    schedule_food_regeneration()
+    {:noreply, state}
+  end
+
+  def handle_cast(:tick, state) do
+    tick = state.tick_counter + 1
+
+    tick_count = state.tick_counter
+
+    if(tick_counter = @tick_interval) do
+      regrow_food()
+      state = %{state | tick_counter: 0}
+    end
+
     {:noreply, state}
   end
 
@@ -57,9 +69,9 @@ defmodule ColonyGame.Game.ForagingServer do
     :ets.insert(:food_sources, {:main_location, Enum.random(10..30)})
   end
 
-  defp schedule_food_regeneration() do
-    Process.send_after(self(), :regrow_food, @tick_interval)
-  end
+  # defp schedule_food_regeneration() do
+  #  Process.send_after(self(), :regrow_food, @tick_interval)
+  # end
 
   defp seed_food_sources() do
     :ets.insert(:food_sources, {:main_location, Enum.random(10..30)})
