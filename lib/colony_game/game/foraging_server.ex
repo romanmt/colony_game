@@ -39,8 +39,6 @@ defmodule ColonyGame.Game.ForagingServer do
   end
 
   def handle_cast(:tick, state) do
-    tick = state.tick_counter + 1
-
     tick_count = state.tick_counter
 
     if(tick_counter = @tick_interval) do
