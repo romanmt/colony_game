@@ -44,10 +44,6 @@ defmodule ColonyGame.Game.PlayerProcess do
     {:reply, state, state}
   end
 
-  def handle_cast({:update_resources, new_resources}, state) do
-    {:noreply, %{state | resources: new_resources}}
-  end
-
   def handle_cast(:tick, state) do
     Logger.debug(inspect(state))
     tick = state.tick_counter + 1
