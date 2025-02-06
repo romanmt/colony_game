@@ -2,7 +2,14 @@ defmodule ColonyGame.Game.PlayerProcess do
   use GenServer
   import Logger
 
-  @initial_resources %{food: 100, water: 100, energy: 100}
+  defmodule PlayerState do
+    defstruct [
+      :player_id,
+      :last_updated,
+      :tick_counter,
+      resources: [:food, :water, :energy]
+    ]
+  end
 
   ## Public API
 
@@ -21,9 +28,9 @@ defmodule ColonyGame.Game.PlayerProcess do
   ## GenServer Callbacks
 
   def init(player_id) do
-    state = %{
+    state = %PlayerState{
       player_id: player_id,
-      resources: @initial_resources,
+      resources: %{food: 100, water: 100, energy: 100},
       last_updated: System.system_time(:second),
       tick_counter: 0
     }
@@ -45,7 +52,6 @@ defmodule ColonyGame.Game.PlayerProcess do
   end
 
   def handle_cast(:tick, state) do
-    Logger.debug(inspect(state))
     tick = state.tick_counter + 1
 
     new_resources = state.resources
@@ -64,7 +70,7 @@ defmodule ColonyGame.Game.PlayerProcess do
     })
 
     {:noreply,
-     %{
+     %PlayerState{
        state
        | resources: new_resources,
          tick_counter: tick,
