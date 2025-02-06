@@ -1,5 +1,6 @@
 defmodule ColonyGameWeb.GameLive do
   use Phoenix.LiveView
+  require ColonyGameWeb.Endpoint
   require Logger
 
   alias ColonyGame.Game.{PlayerSupervisor, PlayerProcess}
@@ -11,7 +12,8 @@ defmodule ColonyGameWeb.GameLive do
     Logger.info("Starting player process for ID: #{player_id}")
     PlayerSupervisor.start_player(player_id)
 
-    if connected?(socket), do: Process.send_after(self(), :tick, 5000)
+    if connected?(socket),
+      do: ColonyGameWeb.Endpoint.subscribe("player:#{player_id}")
 
     state = PlayerProcess.get_state(player_id)
 
@@ -24,13 +26,11 @@ defmodule ColonyGameWeb.GameLive do
   end
 
   @impl true
-  def handle_info(:tick, socket) do
-    state = PlayerProcess.get_state(socket.assigns.player_id)
-    new_resources = state.resources
-    tick_counter = state.tick_counter
-    # Reschedule the next tick
-    Process.send_after(self(), :tick, 5000)
-    {:noreply, assign(socket, resources: new_resources, tick_counter: tick_counter)}
+  def handle_info(
+        %{event: "tick_update", payload: %{resources: resources, tick_counter: tick}},
+        socket
+      ) do
+    {:noreply, assign(socket, resources: resources, tick_counter: tick)}
   end
 
   @impl true

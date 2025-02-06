@@ -57,6 +57,12 @@ defmodule ColonyGame.Game.PlayerProcess do
         new_resources
       end
 
+    # ✅ Broadcast an event to LiveView
+    ColonyGameWeb.Endpoint.broadcast("player:#{state.player_id}", "tick_update", %{
+      resources: new_resources,
+      tick_counter: tick
+    })
+
     {:noreply,
      %{
        state
