@@ -21,33 +21,31 @@ defmodule ColonyGameWeb.GameLive do
      assign(socket,
        player_id: player_id,
        resources: state.resources,
+       status: :idle,
        tick_counter: state.tick_counter
      )}
   end
 
   @impl true
   def handle_info(
-        %{event: "tick_update", payload: %{resources: resources, tick_counter: tick}},
+        %{
+          event: "tick_update",
+          payload: %{resources: resources, status: status, tick_counter: tick}
+        },
         socket
       ) do
-    {:noreply, assign(socket, resources: resources, tick_counter: tick)}
+    {:noreply, assign(socket, resources: resources, status: status, tick_counter: tick)}
   end
 
   @impl true
   def handle_event("forage", _params, socket) do
-    case ColonyGame.Game.ForagingServer.forage(socket.assigns.player_id) do
-      {:ok, amount} ->
-        new_resources = PlayerProcess.get_state(socket.assigns.player_id).resources
-        {:noreply, assign(socket, resources: new_resources)}
+    case PlayerProcess.forage(socket.assigns.player_id) do
+      {:ok, new_state} ->
+        {:noreply,
+         assign(socket, status: new_state.status, foraging_ticks: new_state.foraging_ticks)}
 
-      :empty ->
-        Logger.info("out of food")
-
-        socket =
-          socket
-          |> put_flash(:error, "No food left!")
-
-        {:noreply, socket}
+      {:error, message} ->
+        {:noreply, put_flash(socket, :error, message)}
     end
   end
 
@@ -55,7 +53,7 @@ defmodule ColonyGameWeb.GameLive do
   def render(assigns) do
     ~H"""
     <div>
-      <h1>Welcome, Colonist <%= @player_id %></h1>
+      <h1>Welcome, Colonist <%= @player_id %> <%= @status %></h1>
       <p>Civilization Age: <%= @tick_counter %></p>
 
       <p>Resources:</p>
