@@ -52,23 +52,37 @@ defmodule ColonyGameWeb.GameLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div>
-      <h1>Welcome, Colonist <%= @player_id %> <%= @status %></h1>
-      <p>Civilization Age: <%= @tick_counter %></p>
+    <div class="max-w-lg mx-auto p-6 bg-gray-100 rounded-lg shadow-lg">
+    <h1 class="text-2xl font-bold text-gray-800 mb-4">🚀 Welcome, Colonist <%= @player_id %></h1>
+    <p class="text-lg text-gray-600 mb-2">🌎 Civilization Age: <%= @tick_counter %> ticks</p>
 
-      <p>Resources:</p>
-      <ul>
-        <li>Food: <%= @resources.food %></li>
-        <li>Water: <%= @resources.water %></li>
-        <li>Energy: <%= @resources.energy %></li>
+    <div class="bg-white p-4 rounded-lg shadow-md">
+      <h2 class="text-xl font-semibold text-gray-700 mb-3">📊 Resources:</h2>
+      <ul class="space-y-2">
+        <li class="text-gray-700">🍞 Food: <strong><%= @resources.food %></strong></li>
+        <li class="text-gray-700">💧 Water: <strong><%= @resources.water %></strong></li>
+        <li class="text-gray-700">⚡ Energy: <strong><%= @resources.energy %></strong></li>
       </ul>
-
-      <button phx-click="forage">Forage for Food</button>
-
-      <p class="alert alert-danger" role="alert" phx-click="lv:clear-flash" phx-value-key="error">
-        <%= live_flash(@flash, :error) %>
-      </p>
     </div>
+
+    <div class="mt-4">
+      <%= if @status == :idle do %>
+        <button
+          phx-click="forage"
+          class="mt-4 px-6 py-2 bg-green-500 text-white font-semibold rounded-md shadow-md hover:bg-green-600 transition"
+        >
+          🌿 Forage for Food
+        </button>
+      <% else %>
+        <p class="text-yellow-600 font-semibold mt-4">⏳ Currently <%= @status %>...</p>
+      <% end %>
+    </div>
+
+    <%= if @flash[:error] do %>
+      <p class="mt-4 text-red-600 font-semibold"><%= @flash[:error] %></p>
+    <% end %>
+    </div>
+
     """
   end
 
