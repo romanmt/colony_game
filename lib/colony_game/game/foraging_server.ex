@@ -41,7 +41,7 @@ defmodule ColonyGame.Game.ForagingServer do
   def handle_cast(:tick, state) do
     tick_count = state.tick_counter
 
-    if(tick_counter = @tick_interval) do
+    if(tick_count == @tick_interval) do
       regrow_food()
       state = %{state | tick_counter: 0}
     end
