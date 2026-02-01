@@ -15,6 +15,23 @@ A real-time multiplayer colony survival game built with Elixir/Phoenix LiveView 
 - Identity is hidden to enable social deduction and strategy
 - Do NOT add features that reveal player identity
 
+### UI/UX Design Goals
+- Intuitive graphical interface
+- Clear visual feedback for actions and state changes
+- Mobile-friendly responsive design (works on iOS)
+- Real-time updates without page refresh (LiveView)
+
+#### UI Elements (TBD)
+- [ ] Resource display (food, water, energy bars/indicators)
+- [ ] Action buttons (forage, rest, build, etc.)
+- [ ] Colony/map view
+- [ ] Anonymous player presence indicators
+- [ ] Chat panel (anonymous)
+- [ ] Status notifications
+
+#### Visual Style (TBD)
+- Pending design direction decision
+
 ## Current State
 
 ### Implemented
