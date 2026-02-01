@@ -90,14 +90,16 @@ if(tick_counter == @tick_interval) do
 ## Development Plan
 
 ### Phase 1: CI/CD & Dev Deployment (Priority: Immediate)
+**Hosting:** Fly.io
+
 1. Set up GitHub Actions workflow
    - Run tests on PR/push
-   - Build Docker image or Elixir release
-2. Choose hosting platform (Fly.io, Render, Railway, or self-hosted)
-3. Configure production environment variables
-4. Set up PostgreSQL for production
-5. Auto-deploy main branch to dev server
-6. Document deployment URL and process
+   - Build Elixir release
+2. Configure Fly.io app (`fly launch`)
+3. Set up Fly Postgres database
+4. Configure secrets (SECRET_KEY_BASE, DATABASE_URL)
+5. Auto-deploy main branch via GitHub Actions
+6. Document deployment URL
 
 **Goal:** View live progress on a dev URL after each merge
 
