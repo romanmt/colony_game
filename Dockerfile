@@ -76,16 +76,8 @@ RUN chown nobody /app
 ENV MIX_ENV="prod"
 
 # Only copy the final release from the build stage
+# The release includes bin/server and bin/migrate from rel/overlays
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/colony_game ./
-
-# Create the migrate script for Fly.io release_command
-RUN mkdir -p /app/bin
-COPY --chmod=755 <<'EOF' /app/bin/migrate
-#!/bin/sh
-set -eu
-cd /app
-./bin/colony_game eval "ColonyGame.Release.migrate()"
-EOF
 
 USER nobody
 
