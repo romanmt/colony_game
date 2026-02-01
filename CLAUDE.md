@@ -89,32 +89,44 @@ if(tick_counter == @tick_interval) do
 
 ## Development Plan
 
-### Phase 1: Stabilization
+### Phase 1: CI/CD & Dev Deployment (Priority: Immediate)
+1. Set up GitHub Actions workflow
+   - Run tests on PR/push
+   - Build Docker image or Elixir release
+2. Choose hosting platform (Fly.io, Render, Railway, or self-hosted)
+3. Configure production environment variables
+4. Set up PostgreSQL for production
+5. Auto-deploy main branch to dev server
+6. Document deployment URL and process
+
+**Goal:** View live progress on a dev URL after each merge
+
+### Phase 2: Stabilization
 1. Fix ForagingServer tick comparison bug
 2. Add tests for PlayerProcess
 3. Add tests for ForagingServer
 4. Add tests for TickServer
 5. Implement water/energy consumption (already defined, not used)
 
-### Phase 2: Persistence
+### Phase 3: Persistence
 1. Create Ecto schemas for Player, Resources, GameState
 2. Add database migrations
 3. Persist player state on updates
 4. Load player state on reconnect
 5. Add player authentication (optional: can start with session-based)
 
-### Phase 3: Gameplay Expansion
+### Phase 4: Gameplay Expansion
 1. Multiple foraging locations with different resources
 2. Water sources (wells, rivers)
 3. Energy mechanics (rest, shelter)
 4. Basic inventory system
 5. Colony buildings (shelter, storage, well)
 
-### Phase 4: Multiplayer Features
+### Phase 5: Multiplayer Features
 1. Show other players in UI
-2. Resource sharing/trading
-3. Collaborative building
-4. Chat system
+2. Anonymous chat system
+3. Resource sharing/trading
+4. Collaborative building
 
 ## Architecture Notes
 
