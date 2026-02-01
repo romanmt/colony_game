@@ -6,6 +6,15 @@ A real-time multiplayer colony survival game built with Elixir/Phoenix LiveView 
 
 **Tech Stack:** Elixir 1.18, Phoenix 1.7.19, LiveView, PostgreSQL (not yet integrated), Tailwind CSS
 
+## Game Design Principles
+
+### Anonymous Players
+- Players remain anonymous (no usernames displayed)
+- Anonymous chat is a core strategic feature
+- Players can bluff, form secret alliances, or deceive others
+- Identity is hidden to enable social deduction and strategy
+- Do NOT add features that reveal player identity
+
 ## Current State
 
 ### Implemented
