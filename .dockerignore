@@ -1,0 +1,77 @@
+# .dockerignore - Exclude files from Docker build context
+
+# Git
+.git
+.gitignore
+
+# Elixir/Mix build artifacts
+_build/
+deps/
+*.ez
+
+# Generated on crash by the VM
+erl_crash.dump
+
+# Static artifacts - will be rebuilt
+priv/static/assets/
+
+# Node modules (if any)
+node_modules/
+assets/node_modules/
+
+# Test files
+/test/
+*.test.exs
+.formatter.exs
+
+# Development and test config
+/config/*.secret.exs
+config/dev.exs
+config/test.exs
+
+# IDE and editor files
+.elixir_ls/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+/doc/
+*.md
+!README.md
+
+# Docker files (don't need themselves in context)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Fly.io
+fly.toml
+
+# Environment files
+.env
+.env.*
+*.env
+
+# macOS
+.DS_Store
+
+# Temporary files
+tmp/
+/tmp/
+*.tmp
+
+# Log files
+*.log
+/log/
+
+# Coverage reports
+/cover/
+
+# Release files (we build fresh)
+/rel/overlays/
+
+# Dialyzer
+/priv/plts/
