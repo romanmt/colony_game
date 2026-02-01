@@ -21,16 +21,30 @@ A real-time multiplayer colony survival game built with Elixir/Phoenix LiveView 
 - Mobile-friendly responsive design (works on iOS)
 - Real-time updates without page refresh (LiveView)
 
-#### UI Elements (TBD)
-- [ ] Resource display (food, water, energy bars/indicators)
-- [ ] Action buttons (forage, rest, build, etc.)
-- [ ] Colony/map view
-- [ ] Anonymous player presence indicators
-- [ ] Chat panel (anonymous)
-- [ ] Status notifications
+#### Layout: Hybrid (Game Map + UI Panels)
+- Central game map/colony view (top-down or isometric)
+- Resource bars at top
+- Action buttons at bottom
+- Chat panel (collapsible sidebar or bottom drawer)
+- Status notifications as toasts/overlays
 
-#### Visual Style (TBD)
-- Pending design direction decision
+#### UI Elements
+- [ ] Resource bars (food=green, water=blue, energy=yellow)
+- [ ] Central colony/map view with clickable locations
+- [ ] Action buttons (large, touch-friendly for mobile)
+- [ ] Anonymous player dots/indicators on map
+- [ ] Chat panel (anonymous, collapsible)
+- [ ] Toast notifications for events
+- [ ] Foraging progress indicator
+
+#### Visual Style: Low-Fi Colorful
+**Inspiration:** The Tower (iOS tower defense game)
+- Simple geometric shapes (circles, rounded rectangles)
+- Bold, saturated colors on dark or muted background
+- Clear visual hierarchy - important things pop
+- Smooth animations for state changes
+- Minimal text, icons where possible
+- Touch-friendly hit targets (44px+ for mobile)
 
 ## Current State
 
