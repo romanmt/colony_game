@@ -10,12 +10,16 @@ defmodule ColonyGame.Game.Rules do
     :state,
     :current_state_counter,
     :resources,
+    :inventory,
     :last_updated,
-    :tick_counter
+    :tick_counter,
+    :foraging_location  # Track which location the player is foraging at (:forest, :river, :cave)
   ]
 
   @type resource_type :: :food | :water | :energy
   @type resources :: %{resource_type() => non_neg_integer()}
+  @type item_type :: :wood | :stone | :fiber | :berries
+  @type inventory :: %{item_type() => non_neg_integer()}
   @type game_state :: :idle | :foraging
 
   @foraging_duration 5  # ticks
@@ -34,19 +38,40 @@ defmodule ColonyGame.Game.Rules do
       state: :idle,
       current_state_counter: 0,
       resources: %{food: 100, water: 100, energy: 100},
+      inventory: %{wood: 0, stone: 0, fiber: 0, berries: 0},
       last_updated: System.system_time(:second),
-      tick_counter: 0
+      tick_counter: 0,
+      foraging_location: nil
     }
   end
 
   @doc """
-  Handles the begin_foraging action based on current game state
+  Handles the begin_foraging action based on current game state.
+  Accepts an optional location parameter (:forest, :river, or :cave).
+  Defaults to :forest for backwards compatibility.
   """
   def check(%Rules{state: :idle} = rules, :begin_foraging) do
-    {:ok, %Rules{rules | state: :foraging, current_state_counter: @foraging_duration}}
+    check(rules, {:begin_foraging, :forest})
+  end
+
+  def check(%Rules{state: :idle} = rules, {:begin_foraging, location})
+      when location in [:forest, :river, :cave] do
+    {:ok, %Rules{rules |
+      state: :foraging,
+      current_state_counter: @foraging_duration,
+      foraging_location: location
+    }}
+  end
+
+  def check(%Rules{state: :idle}, {:begin_foraging, _invalid_location}) do
+    {:error, :invalid_location}
   end
 
   def check(%Rules{state: :foraging}, :begin_foraging) do
+    {:error, :already_foraging}
+  end
+
+  def check(%Rules{state: :foraging}, {:begin_foraging, _location}) do
     {:error, :already_foraging}
   end
 
@@ -68,6 +93,51 @@ defmodule ColonyGame.Game.Rules do
       max(old + new, 0)
     end)
     %Rules{rules | resources: updated_resources}
+  end
+
+  @doc """
+  Adds an item to the inventory. Returns updated Rules struct.
+  """
+  def add_item(%Rules{} = rules, item, amount) when is_atom(item) and amount > 0 do
+    current = Map.get(rules.inventory, item, 0)
+    updated_inventory = Map.put(rules.inventory, item, current + amount)
+    %Rules{rules | inventory: updated_inventory}
+  end
+
+  def add_item(%Rules{} = rules, _item, _amount), do: rules
+
+  @doc """
+  Removes an item from the inventory. Returns {:ok, updated_rules} or {:error, :insufficient_items}.
+  """
+  def remove_item(%Rules{} = rules, item, amount) when is_atom(item) and amount > 0 do
+    current = Map.get(rules.inventory, item, 0)
+
+    if current >= amount do
+      updated_inventory = Map.put(rules.inventory, item, current - amount)
+      {:ok, %Rules{rules | inventory: updated_inventory}}
+    else
+      {:error, :insufficient_items}
+    end
+  end
+
+  def remove_item(%Rules{} = rules, _item, _amount), do: {:ok, rules}
+
+  @doc """
+  Checks if the player has at least the specified amount of an item.
+  """
+  def has_item?(%Rules{} = rules, item, amount \\ 1) when is_atom(item) do
+    current = Map.get(rules.inventory, item, 0)
+    current >= amount
+  end
+
+  @doc """
+  Adds multiple items to the inventory at once.
+  Expects a map of item => amount.
+  """
+  def add_items(%Rules{} = rules, items) when is_map(items) do
+    Enum.reduce(items, rules, fn {item, amount}, acc ->
+      add_item(acc, item, amount)
+    end)
   end
 
   # Private helper functions
@@ -108,7 +178,7 @@ defmodule ColonyGame.Game.Rules do
   end
 
   defp update_state_counter(%Rules{state: :foraging, current_state_counter: 1} = rules) do
-    %Rules{rules | state: :idle, current_state_counter: 0}
+    %Rules{rules | state: :idle, current_state_counter: 0, foraging_location: nil}
   end
 
   defp update_state_counter(%Rules{state: :foraging, current_state_counter: counter} = rules) when counter > 0 do

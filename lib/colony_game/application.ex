@@ -17,6 +17,7 @@ defmodule ColonyGame.Application do
       # Start a worker by calling: ColonyGame.Worker.start_link(arg)
       # {ColonyGame.Worker, arg},
       {Registry, keys: :unique, name: ColonyGame.Game.Registry},
+      ColonyGame.Game.PlayerPresence,
       ColonyGame.Game.PlayerSupervisor,
       ColonyGame.Game.TickServer,
       ColonyGame.Game.ForagingServer,

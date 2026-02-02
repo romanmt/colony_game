@@ -18,6 +18,7 @@ defmodule ColonyGame.Game.Schemas.Player do
     field :water, :integer, default: 100
     field :energy, :integer, default: 100
     field :state, :string, default: "idle"
+    field :last_seen, :utc_datetime
 
     timestamps(type: :utc_datetime)
   end
@@ -27,12 +28,13 @@ defmodule ColonyGame.Game.Schemas.Player do
   """
   def create_changeset(player, attrs) do
     player
-    |> cast(attrs, [:session_id, :food, :water, :energy, :state])
+    |> cast(attrs, [:session_id, :food, :water, :energy, :state, :last_seen])
     |> validate_required([:session_id])
     |> validate_inclusion(:state, ["idle", "foraging"])
     |> validate_number(:food, greater_than_or_equal_to: 0)
     |> validate_number(:water, greater_than_or_equal_to: 0)
     |> validate_number(:energy, greater_than_or_equal_to: 0)
+    |> put_last_seen()
     |> unique_constraint(:session_id)
   end
 
@@ -41,10 +43,15 @@ defmodule ColonyGame.Game.Schemas.Player do
   """
   def update_changeset(player, attrs) do
     player
-    |> cast(attrs, [:food, :water, :energy, :state])
+    |> cast(attrs, [:food, :water, :energy, :state, :last_seen])
     |> validate_inclusion(:state, ["idle", "foraging"])
     |> validate_number(:food, greater_than_or_equal_to: 0)
     |> validate_number(:water, greater_than_or_equal_to: 0)
     |> validate_number(:energy, greater_than_or_equal_to: 0)
+    |> put_last_seen()
+  end
+
+  defp put_last_seen(changeset) do
+    put_change(changeset, :last_seen, DateTime.utc_now() |> DateTime.truncate(:second))
   end
 end

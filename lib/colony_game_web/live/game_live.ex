@@ -3,7 +3,7 @@ defmodule ColonyGameWeb.GameLive do
   require ColonyGameWeb.Endpoint
   require Logger
 
-  alias ColonyGame.Game.{PlayerSupervisor, PlayerProcess, ChatServer}
+  alias ColonyGame.Game.{PlayerSupervisor, PlayerProcess, ChatServer, PlayerPresence}
 
   # Maximum resource value for percentage calculations
   @max_resource 200
@@ -19,10 +19,14 @@ defmodule ColonyGameWeb.GameLive do
       ColonyGameWeb.Endpoint.subscribe("player:#{player_id}")
       # Subscribe to chat updates
       Phoenix.PubSub.subscribe(ColonyGame.PubSub, "chat:lobby")
+      # Subscribe to presence updates for anonymous player indicators
+      Phoenix.PubSub.subscribe(ColonyGame.PubSub, PlayerPresence.presence_topic())
     end
 
     state = PlayerProcess.get_state(player_id)
     messages = ChatServer.get_messages()
+    # Get initial presence summary (anonymous aggregate data)
+    presence = PlayerPresence.get_presence_summary()
 
     {:ok,
      assign(socket,
@@ -31,9 +35,12 @@ defmodule ColonyGameWeb.GameLive do
        status: :idle,
        tick_counter: state.tick_counter,
        foraging_ticks: Map.get(state, :foraging_ticks, 0),
+       foraging_location: Map.get(state, :foraging_location),
        chat_messages: messages,
        chat_open: false,
-       chat_input: ""
+       chat_input: "",
+       # Presence data (anonymous)
+       presence: presence
      )}
   end
 
@@ -46,7 +53,14 @@ defmodule ColonyGameWeb.GameLive do
         socket
       ) do
     foraging_ticks = Map.get(payload, :foraging_ticks, 0)
-    {:noreply, assign(socket, resources: resources, status: status, tick_counter: tick, foraging_ticks: foraging_ticks)}
+    foraging_location = Map.get(payload, :foraging_location)
+    {:noreply, assign(socket,
+      resources: resources,
+      status: status,
+      tick_counter: tick,
+      foraging_ticks: foraging_ticks,
+      foraging_location: foraging_location
+    )}
   end
 
   @impl true
@@ -59,11 +73,39 @@ defmodule ColonyGameWeb.GameLive do
   end
 
   @impl true
-  def handle_event("forage", _params, socket) do
-    case PlayerProcess.forage(socket.assigns.player_id) do
+  def handle_info({:presence_update, presence}, socket) do
+    # Update anonymous presence data (player counts and activity)
+    {:noreply, assign(socket, presence: presence)}
+  end
+
+  @impl true
+  def handle_event("forage", %{"location" => location}, socket) do
+    location_atom = String.to_existing_atom(location)
+    case PlayerProcess.forage(socket.assigns.player_id, location_atom) do
       {:ok, new_state} ->
         {:noreply,
-         assign(socket, status: new_state.status, foraging_ticks: new_state.foraging_ticks)}
+         assign(socket,
+           status: new_state.status,
+           foraging_ticks: new_state.foraging_ticks,
+           foraging_location: new_state.foraging_location
+         )}
+
+      {:error, message} ->
+        {:noreply, put_flash(socket, :error, message)}
+    end
+  end
+
+  @impl true
+  def handle_event("forage", _params, socket) do
+    # Default to forest for backwards compatibility
+    case PlayerProcess.forage(socket.assigns.player_id, :forest) do
+      {:ok, new_state} ->
+        {:noreply,
+         assign(socket,
+           status: new_state.status,
+           foraging_ticks: new_state.foraging_ticks,
+           foraging_location: new_state.foraging_location
+         )}
 
       {:error, message} ->
         {:noreply, put_flash(socket, :error, message)}
@@ -107,6 +149,19 @@ defmodule ColonyGameWeb.GameLive do
           <%= @flash[:error] %>
         </div>
       <% end %>
+
+      <!-- Survivor Count Header -->
+      <div class="presence-header">
+        <div class="survivor-count">
+          <span class="survivor-icon"></span>
+          <span class="survivor-text"><%= survivor_count_text(@presence.total_count) %></span>
+        </div>
+        <%= if @presence.foraging_count > 0 do %>
+          <div class="activity-indicator activity-indicator--foraging">
+            <%= activity_text(@presence.foraging_count, :foraging) %>
+          </div>
+        <% end %>
+      </div>
 
       <!-- Resource Bars at Top -->
       <div class="resource-bar-container">
@@ -157,9 +212,28 @@ defmodule ColonyGameWeb.GameLive do
           <%= status_text(@status) %>
         </div>
 
-        <!-- Foraging Progress or Map Placeholder -->
+        <!-- Colony Map with Anonymous Player Dots -->
+        <div class="colony-map">
+          <!-- Central colony structure -->
+          <div class="colony-center">
+            <div class="colony-building"></div>
+          </div>
+
+          <!-- Anonymous player dots - positions are random, no IDs visible -->
+          <%= for {dot, index} <- Enum.with_index(@presence.player_dots) do %>
+            <div
+              class={"player-dot player-dot--#{dot.activity}"}
+              style={"left: #{elem(dot.position, 0) * 100}%; top: #{elem(dot.position, 1) * 100}%;"}
+              data-index={index}
+            >
+              <div class="player-dot-pulse"></div>
+            </div>
+          <% end %>
+        </div>
+
+        <!-- Foraging Progress Overlay -->
         <%= if @status == :foraging do %>
-          <div class="foraging-progress animate-fade-in">
+          <div class="foraging-overlay animate-fade-in">
             <div class="progress-ring">
               <div class="progress-ring-bg"></div>
               <div class="progress-ring-fill"></div>
@@ -177,15 +251,6 @@ defmodule ColonyGameWeb.GameLive do
                 <% end %>
               </div>
             </div>
-          </div>
-        <% else %>
-          <div class="map-placeholder">
-            <div class="map-placeholder-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16 mx-auto opacity-30">
-                <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
-              </svg>
-            </div>
-            <p class="map-placeholder-text">Colony Map Coming Soon</p>
           </div>
         <% end %>
 
@@ -305,4 +370,13 @@ defmodule ColonyGameWeb.GameLive do
   defp generate_anonymous_id do
     :crypto.strong_rand_bytes(8) |> Base.encode16()
   end
+
+  # Presence helper functions
+
+  defp survivor_count_text(1), do: "1 survivor in colony"
+  defp survivor_count_text(count), do: "#{count} survivors in colony"
+
+  defp activity_text(1, :foraging), do: "Someone is foraging..."
+  defp activity_text(count, :foraging), do: "#{count} survivors foraging..."
+  defp activity_text(_, _), do: ""
 end
