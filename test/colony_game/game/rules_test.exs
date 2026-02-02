@@ -58,6 +58,60 @@ defmodule ColonyGame.Game.RulesTest do
       assert rules.resources.food == 0
     end
 
+    test "consumes water every 10 ticks" do
+      rules = Rules.new()
+
+      # Process 9 ticks - should not consume water
+      rules = Enum.reduce(1..9, rules, fn _, acc -> Rules.process_tick(acc) end)
+      assert rules.resources.water == 100
+
+      # Process 10th tick - should consume 1 water
+      rules = Rules.process_tick(rules)
+      assert rules.resources.water == 99
+    end
+
+    test "prevents water from going below 0" do
+      rules = %Rules{Rules.new() | resources: %{food: 100, water: 0, energy: 100}}
+
+      # Process 10 ticks to trigger water consumption
+      rules = Enum.reduce(1..10, rules, fn _, acc -> Rules.process_tick(acc) end)
+      assert rules.resources.water == 0
+    end
+
+    test "consumes energy every 15 ticks" do
+      rules = Rules.new()
+
+      # Process 14 ticks - should not consume energy
+      rules = Enum.reduce(1..14, rules, fn _, acc -> Rules.process_tick(acc) end)
+      assert rules.resources.energy == 100
+
+      # Process 15th tick - should consume 1 energy
+      rules = Rules.process_tick(rules)
+      assert rules.resources.energy == 99
+    end
+
+    test "prevents energy from going below 0" do
+      rules = %Rules{Rules.new() | resources: %{food: 100, water: 100, energy: 0}}
+
+      # Process 15 ticks to trigger energy consumption
+      rules = Enum.reduce(1..15, rules, fn _, acc -> Rules.process_tick(acc) end)
+      assert rules.resources.energy == 0
+    end
+
+    test "consumes all resources at their respective intervals" do
+      rules = Rules.new()
+
+      # Process 30 ticks
+      # Food: consumed at ticks 5, 10, 15, 20, 25, 30 = 6 times = -6
+      # Water: consumed at ticks 10, 20, 30 = 3 times = -3
+      # Energy: consumed at ticks 15, 30 = 2 times = -2
+      rules = Enum.reduce(1..30, rules, fn _, acc -> Rules.process_tick(acc) end)
+
+      assert rules.resources.food == 94
+      assert rules.resources.water == 97
+      assert rules.resources.energy == 98
+    end
+
     test "decrements foraging counter and transitions to idle when complete" do
       rules = %Rules{Rules.new() | state: :foraging, current_state_counter: 2}
 

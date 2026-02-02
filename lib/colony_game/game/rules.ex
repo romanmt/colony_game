@@ -21,6 +21,10 @@ defmodule ColonyGame.Game.Rules do
   @foraging_duration 5  # ticks
   @food_consumption_rate 1
   @food_consumption_interval 5  # ticks
+  @water_consumption_rate 1
+  @water_consumption_interval 10  # ticks
+  @energy_consumption_rate 1
+  @energy_consumption_interval 15  # ticks
 
   @doc """
   Creates a new Rules struct with initial state
@@ -73,8 +77,31 @@ defmodule ColonyGame.Game.Rules do
   end
 
   defp consume_resources(%Rules{tick_counter: tick} = rules) do
+    rules
+    |> consume_food(tick)
+    |> consume_water(tick)
+    |> consume_energy(tick)
+  end
+
+  defp consume_food(rules, tick) do
     if rem(tick, @food_consumption_interval) == 0 do
       update_resources(rules, %{food: -@food_consumption_rate})
+    else
+      rules
+    end
+  end
+
+  defp consume_water(rules, tick) do
+    if rem(tick, @water_consumption_interval) == 0 do
+      update_resources(rules, %{water: -@water_consumption_rate})
+    else
+      rules
+    end
+  end
+
+  defp consume_energy(rules, tick) do
+    if rem(tick, @energy_consumption_interval) == 0 do
+      update_resources(rules, %{energy: -@energy_consumption_rate})
     else
       rules
     end

@@ -3,7 +3,10 @@ defmodule ColonyGameWeb.GameLive do
   require ColonyGameWeb.Endpoint
   require Logger
 
-  alias ColonyGame.Game.{PlayerSupervisor, PlayerProcess}
+  alias ColonyGame.Game.{PlayerSupervisor, PlayerProcess, ChatServer}
+
+  # Maximum resource value for percentage calculations
+  @max_resource 200
 
   @impl true
   def mount(_params, _session, socket) do
@@ -12,17 +15,25 @@ defmodule ColonyGameWeb.GameLive do
     Logger.info("Starting player process for ID: #{player_id}")
     PlayerSupervisor.start_player(player_id)
 
-    if connected?(socket),
-      do: ColonyGameWeb.Endpoint.subscribe("player:#{player_id}")
+    if connected?(socket) do
+      ColonyGameWeb.Endpoint.subscribe("player:#{player_id}")
+      # Subscribe to chat updates
+      Phoenix.PubSub.subscribe(ColonyGame.PubSub, "chat:lobby")
+    end
 
     state = PlayerProcess.get_state(player_id)
+    messages = ChatServer.get_messages()
 
     {:ok,
      assign(socket,
        player_id: player_id,
        resources: state.resources,
        status: :idle,
-       tick_counter: state.tick_counter
+       tick_counter: state.tick_counter,
+       foraging_ticks: Map.get(state, :foraging_ticks, 0),
+       chat_messages: messages,
+       chat_open: false,
+       chat_input: ""
      )}
   end
 
@@ -30,11 +41,21 @@ defmodule ColonyGameWeb.GameLive do
   def handle_info(
         %{
           event: "tick_update",
-          payload: %{resources: resources, status: status, tick_counter: tick}
+          payload: %{resources: resources, status: status, tick_counter: tick} = payload
         },
         socket
       ) do
-    {:noreply, assign(socket, resources: resources, status: status, tick_counter: tick)}
+    foraging_ticks = Map.get(payload, :foraging_ticks, 0)
+    {:noreply, assign(socket, resources: resources, status: status, tick_counter: tick, foraging_ticks: foraging_ticks)}
+  end
+
+  @impl true
+  def handle_info({:new_chat_message, message}, socket) do
+    # Add new message to the list (newest at the end for display)
+    messages = socket.assigns.chat_messages ++ [message]
+    # Keep only last 50 messages
+    messages = Enum.take(messages, -50)
+    {:noreply, assign(socket, chat_messages: messages)}
   end
 
   @impl true
@@ -50,40 +71,235 @@ defmodule ColonyGameWeb.GameLive do
   end
 
   @impl true
+  def handle_event("toggle_chat", _params, socket) do
+    {:noreply, assign(socket, chat_open: !socket.assigns.chat_open)}
+  end
+
+  @impl true
+  def handle_event("send_chat", %{"message" => message}, socket) do
+    case ChatServer.send_message(message) do
+      :ok ->
+        {:noreply, assign(socket, chat_input: "")}
+
+      {:error, :empty_message} ->
+        {:noreply, socket}
+
+      {:error, :message_too_long} ->
+        {:noreply, put_flash(socket, :error, "Message too long (max 500 characters)")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to send message")}
+    end
+  end
+
+  @impl true
+  def handle_event("update_chat_input", %{"message" => message}, socket) do
+    {:noreply, assign(socket, chat_input: message)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-lg mx-auto p-6 bg-gray-100 rounded-lg shadow-lg">
-    <h1 class="text-2xl font-bold text-gray-800 mb-4">🚀 Welcome, Colonist <%= @player_id %></h1>
-    <p class="text-lg text-gray-600 mb-2">🌎 Civilization Age: <%= @tick_counter %> ticks</p>
+    <div class="game-container">
+      <!-- Toast Notifications -->
+      <%= if @flash[:error] do %>
+        <div class="toast toast--error">
+          <%= @flash[:error] %>
+        </div>
+      <% end %>
 
-    <div class="bg-white p-4 rounded-lg shadow-md">
-      <h2 class="text-xl font-semibold text-gray-700 mb-3">📊 Resources:</h2>
-      <ul class="space-y-2">
-        <li class="text-gray-700">🍞 Food: <strong><%= @resources.food %></strong></li>
-        <li class="text-gray-700">💧 Water: <strong><%= @resources.water %></strong></li>
-        <li class="text-gray-700">⚡ Energy: <strong><%= @resources.energy %></strong></li>
-      </ul>
-    </div>
+      <!-- Resource Bars at Top -->
+      <div class="resource-bar-container">
+        <!-- Food Bar -->
+        <div class="resource-bar">
+          <div class="resource-icon resource-icon--food">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+              <path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05l-5 2V1h-2v8l-4-3-4 3V1H6v6.05l-5-2 1.66 16.48c.09.82.78 1.46 1.63 1.46h1.66l.66-5.74 1.55.35L7.5 23h9l-.66-5.4 1.55-.35.67 5.74z"/>
+            </svg>
+          </div>
+          <div class="resource-track">
+            <div class="resource-fill resource-fill--food" style={"width: #{resource_percentage(@resources.food)}%"}></div>
+            <span class="resource-value"><%= @resources.food %></span>
+          </div>
+        </div>
 
-    <div class="mt-4">
-      <%= if @status == :idle do %>
-        <button
-          phx-click="forage"
-          class="mt-4 px-6 py-2 bg-green-500 text-white font-semibold rounded-md shadow-md hover:bg-green-600 transition"
-        >
-          🌿 Forage for Food
+        <!-- Water Bar -->
+        <div class="resource-bar">
+          <div class="resource-icon resource-icon--water">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+              <path d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8zm0 18c-3.35 0-6-2.57-6-6.2 0-2.34 1.95-5.44 6-9.14 4.05 3.7 6 6.79 6 9.14 0 3.63-2.65 6.2-6 6.2z"/>
+            </svg>
+          </div>
+          <div class="resource-track">
+            <div class="resource-fill resource-fill--water" style={"width: #{resource_percentage(@resources.water)}%"}></div>
+            <span class="resource-value"><%= @resources.water %></span>
+          </div>
+        </div>
+
+        <!-- Energy Bar -->
+        <div class="resource-bar">
+          <div class="resource-icon resource-icon--energy">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+              <path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z"/>
+            </svg>
+          </div>
+          <div class="resource-track">
+            <div class="resource-fill resource-fill--energy" style={"width: #{resource_percentage(@resources.energy)}%"}></div>
+            <span class="resource-value"><%= @resources.energy %></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Central Game Area -->
+      <div class="game-area">
+        <!-- Status Indicator -->
+        <div class={"status-indicator #{status_class(@status)}"}>
+          <%= status_text(@status) %>
+        </div>
+
+        <!-- Foraging Progress or Map Placeholder -->
+        <%= if @status == :foraging do %>
+          <div class="foraging-progress animate-fade-in">
+            <div class="progress-ring">
+              <div class="progress-ring-bg"></div>
+              <div class="progress-ring-fill"></div>
+              <div class="progress-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#22c55e" class="w-10 h-10">
+                  <path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05l-5 2V1h-2v8l-4-3-4 3V1H6v6.05l-5-2 1.66 16.48c.09.82.78 1.46 1.63 1.46h1.66l.66-5.74 1.55.35L7.5 23h9l-.66-5.4 1.55-.35.67 5.74z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="progress-text">
+              Gathering resources...
+              <div class="progress-ticks">
+                <%= for i <- 1..5 do %>
+                  <div class={"progress-tick #{if i <= @foraging_ticks, do: "progress-tick--complete", else: ""}"}></div>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% else %>
+          <div class="map-placeholder">
+            <div class="map-placeholder-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16 mx-auto opacity-30">
+                <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
+              </svg>
+            </div>
+            <p class="map-placeholder-text">Colony Map Coming Soon</p>
+          </div>
+        <% end %>
+
+        <!-- Tick Counter -->
+        <div class="tick-counter">
+          <div class="tick-dot"></div>
+          <span>Age: <%= @tick_counter %></span>
+        </div>
+      </div>
+
+      <!-- Action Buttons at Bottom -->
+      <div class="action-bar">
+        <%= if @status == :idle do %>
+          <button phx-click="forage" class="action-btn action-btn--primary">
+            <span class="action-btn-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                <path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05l-5 2V1h-2v8l-4-3-4 3V1H6v6.05l-5-2 1.66 16.48c.09.82.78 1.46 1.63 1.46h1.66l.66-5.74 1.55.35L7.5 23h9l-.66-5.4 1.55-.35.67 5.74z"/>
+              </svg>
+            </span>
+            <span class="action-btn-label">Forage</span>
+          </button>
+        <% else %>
+          <button class="action-btn action-btn--disabled" disabled>
+            <span class="action-btn-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                <path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05l-5 2V1h-2v8l-4-3-4 3V1H6v6.05l-5-2 1.66 16.48c.09.82.78 1.46 1.63 1.46h1.66l.66-5.74 1.55.35L7.5 23h9l-.66-5.4 1.55-.35.67 5.74z"/>
+              </svg>
+            </span>
+            <span class="action-btn-label">Foraging...</span>
+          </button>
+        <% end %>
+
+        <button class="action-btn action-btn--secondary">
+          <span class="action-btn-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+              <path d="M19 12h-2v3h-3v2h5v-5zM7 9h3V7H5v5h2V9zm14-6H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16.01H3V4.99h18v14.02z"/>
+            </svg>
+          </span>
+          <span class="action-btn-label">Build</span>
         </button>
-      <% else %>
-        <p class="text-yellow-600 font-semibold mt-4">⏳ Currently <%= @status %>...</p>
+
+        <button phx-click="toggle_chat" class={"action-btn #{if @chat_open, do: "action-btn--chat-active", else: "action-btn--secondary"}"}>
+          <span class="action-btn-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+              <path d="M21 6h-2v9H6v2c0 .55.45 1 1 1h11l4 4V7c0-.55-.45-1-1-1zm-4 6V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z"/>
+            </svg>
+          </span>
+          <span class="action-btn-label">Chat</span>
+        </button>
+      </div>
+
+      <!-- Chat Panel (Collapsible Drawer) -->
+      <%= if @chat_open do %>
+        <div class="chat-panel animate-fade-in">
+          <div class="chat-header">
+            <span class="chat-title">Colony Chat</span>
+            <button phx-click="toggle_chat" class="chat-close-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+            </button>
+          </div>
+
+          <div id="chat-messages" class="chat-messages" phx-hook="ScrollToBottom">
+            <%= if Enum.empty?(@chat_messages) do %>
+              <p class="chat-empty">No messages yet. Say something!</p>
+            <% else %>
+              <%= for message <- @chat_messages do %>
+                <div class="chat-message">
+                  <p class="chat-message-text"><%= message.content %></p>
+                  <span class="chat-message-time"><%= format_timestamp(message.timestamp) %></span>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+
+          <form phx-submit="send_chat" class="chat-input-form">
+            <input
+              type="text"
+              name="message"
+              value={@chat_input}
+              phx-change="update_chat_input"
+              placeholder="Type anonymously..."
+              class="chat-input"
+              maxlength="500"
+              autocomplete="off"
+            />
+            <button type="submit" class="chat-send-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              </svg>
+            </button>
+          </form>
+        </div>
       <% end %>
     </div>
-
-    <%= if @flash[:error] do %>
-      <p class="mt-4 text-red-600 font-semibold"><%= @flash[:error] %></p>
-    <% end %>
-    </div>
-
     """
+  end
+
+  # Helper functions for template
+  defp resource_percentage(value) do
+    min(100, round(value / @max_resource * 100))
+  end
+
+  defp status_class(:idle), do: "status-indicator--idle"
+  defp status_class(:foraging), do: "status-indicator--foraging"
+  defp status_class(_), do: "status-indicator--idle"
+
+  defp status_text(:idle), do: "Ready"
+  defp status_text(:foraging), do: "Foraging"
+  defp status_text(status), do: status |> to_string() |> String.capitalize()
+
+  defp format_timestamp(datetime) do
+    Calendar.strftime(datetime, "%H:%M")
   end
 
   defp generate_anonymous_id do

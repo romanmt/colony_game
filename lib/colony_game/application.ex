@@ -20,6 +20,7 @@ defmodule ColonyGame.Application do
       ColonyGame.Game.PlayerSupervisor,
       ColonyGame.Game.TickServer,
       ColonyGame.Game.ForagingServer,
+      ColonyGame.Game.ChatServer,
       # Start to serve requests, typically the last entry
       ColonyGameWeb.Endpoint
     ]
